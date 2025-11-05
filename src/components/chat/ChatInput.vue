@@ -22,14 +22,30 @@ function onKey(e) {
 
 <template>
   <div class="input-wrap">
-    <textarea class="input" v-model="text" :disabled="sending" @keydown="onKey" placeholder="输入消息，Enter 发送，Shift+Enter 换行"></textarea>
-    <button class="send" :disabled="sending || !text.trim()" @click="doSend">{{ sending ? '发送中...' : '发送' }}</button>
+  <button type="button" class="addon" aria-label="add">+</button>
+  <textarea rows="1" class="input" v-model="text" :disabled="sending" @keydown="onKey" placeholder="有什么可以帮忙的？"></textarea>
+    <button class="send" :disabled="sending || !text.trim()" @click="doSend" :aria-disabled="sending || !text.trim()" aria-label="发送">
+      <template v-if="sending">
+        <span class="dots">...</span>
+      </template>
+      <template v-else>
+        <!-- upward arrow SVG -->
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <path d="M12 19V6" stroke="#000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M5 12l7-7 7 7" stroke="#000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </template>
+    </button>
   </div>
 </template>
 
 <style scoped>
-.input-wrap { display: grid; grid-template-columns: 1fr 96px; gap: 8px; }
-.input { resize: none; height: 72px; padding: 8px 10px; border:1px solid var(--color-border); border-radius:8px; background:var(--color-background); }
-.send { border: none; background: #16a34a; color: #fff; border-radius: 8px; cursor: pointer; }
-.send:disabled { background: #9ca3af; cursor: not-allowed; }
+.input-wrap { display:flex; align-items:center; gap:12px; max-width: 760px; width: 100%; padding: 10px 14px; background: rgba(255,255,255,0.02); border-radius: 999px; box-shadow: 0 6px 18px rgba(0,0,0,0.55); }
+.addon { width: 40px; height: 40px; border-radius: 50%; background: rgba(255,255,255,0.03); border: none; color: #fff; font-size: 20px; display:flex; align-items:center; justify-content:center; cursor: pointer; }
+.input { flex: 1; resize: none; height: 44px; padding: 0 8px; border: none; background: transparent; color: #fff; outline: none; font-size: 15px; text-align: center; line-height: 44px; }
+.input::placeholder { color: #9ca3af; text-align: center; }
+.send { width: 44px; height: 44px; border-radius: 50%; background: #fff; color: #000; border: none; display:flex; align-items:center; justify-content:center; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.35); padding:0; }
+.send svg { display:block; }
+.send .dots { color: #000; font-weight: 700; }
+.send:disabled { background: #9ca3af; color: #fff; cursor: not-allowed; }
 </style>
