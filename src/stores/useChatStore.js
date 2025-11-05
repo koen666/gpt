@@ -28,7 +28,11 @@ function persistState(state) {
   }
 }
 
+let _store
+
 export function useChatStore() {
+  if (_store) return _store
+
   const saved = loadState() || {}
   const providers = getProvidersRegistry()
 
@@ -86,5 +90,6 @@ export function useChatStore() {
 
   watch(state, () => persistState(state), { deep: true })
 
-  return { state, activeProvider, setActiveModel, setProviderSecret, sendMessage, clear }
+  _store = { state, activeProvider, setActiveModel, setProviderSecret, sendMessage, clear }
+  return _store
 }

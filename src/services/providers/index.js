@@ -1,12 +1,13 @@
-import { createEchoProvider } from './provider-echo'
-import { createOpenAIProvider } from './provider-openai'
+import { createStubProvider } from './provider-stub'
 
-// Registry of available model providers. Add new providers here.
+// Registry of available model providers. Replace or extend with real providers later.
 export function getProvidersRegistry() {
   const list = [
-    createEchoProvider(),
-    createOpenAIProvider(),
+    createStubProvider({ id: 'deepseek', name: 'DeepSeek', description: 'DeepSeek' }),
+    createStubProvider({ id: 'doubao', name: '豆包', description: '豆包' }),
+    createStubProvider({ id: 'chatgpt', name: 'ChatGPT', description: 'ChatGPT' }),
+    createStubProvider({ id: 'gemeni', name: 'Gemeni', description: 'Gemen' }),
   ]
-  // Filter out providers possibly disabled by env flags in future
+
   return list
 }
