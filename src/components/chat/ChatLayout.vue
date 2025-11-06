@@ -1,11 +1,12 @@
 <script setup>
+
 import { ref } from 'vue'
 import Sidebar from './Sidebar.vue'
 import MessageList from './MessageList.vue'
 import ChatInput from './ChatInput.vue'
 import { useChatStore } from '../../stores/useChatStore'
 
-const { state, activeProvider, sendMessage, clear } = useChatStore()
+const { state, activeProvider, sendMessage, clear, currentSession, sessionsForActiveModel, createSession, selectSession, deleteSession, setActiveModel } = useChatStore()
 
 // sidebar collapse state
 const collapsed = ref(false)
@@ -24,7 +25,7 @@ function toggleSidebar() { collapsed.value = !collapsed.value }
         </div>
       </header>
 
-      <MessageList :messages="state.messages" />
+  <MessageList :messages="(currentSession && currentSession.messages) || []" />
 
       <footer class="bottombar">
         <ChatInput :sending="state.isSending" @send="sendMessage" />

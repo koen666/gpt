@@ -18,7 +18,8 @@ function loadState() {
 function persistState(state) {
   try {
     const copy = {
-      messages: state.messages,
+      messagesByModel: state.messagesByModel,
+      currentSessionByModel: state.currentSessionByModel,
       activeModelId: state.activeModelId,
       providerSecrets: state.providerSecrets,
     }
@@ -36,11 +37,16 @@ export function useChatStore() {
   const saved = loadState() || {}
   const providers = getProvidersRegistry()
 
+  // messagesByModel: { [modelId]: [ { id: sessionId, title, createdAt, messages: [...] }, ... ] }
+  const messagesByModelSaved = saved.messagesByModel || {}
+  const currentSessionByModelSaved = saved.currentSessionByModel || {}
+
   const state = reactive({
     providers,
-    providerSecrets: saved.providerSecrets || {}, // {providerId: {apiKey: ''}}
+    providerSecrets: saved.providerSecrets || {},
     activeModelId: saved.activeModelId || providers[0]?.id || 'echo',
-    messages: saved.messages || [], // {id, role: 'user'|'assistant'|'system', content, modelId}
+    messagesByModel: messagesByModelSaved,
+    currentSessionByModel: currentSessionByModelSaved,
     isSending: false,
     error: null,
   })
@@ -51,6 +57,11 @@ export function useChatStore() {
 
   function setActiveModel(id) {
     state.activeModelId = id
+    // ensure there's at least one session for this model
+    if (!state.messagesByModel[id]) state.messagesByModel[id] = []
+    if (!state.currentSessionByModel[id] && state.messagesByModel[id].length) {
+      state.currentSessionByModel[id] = state.messagesByModel[id][0].id
+    }
   }
 
   function setProviderSecret(providerId, key, value) {
@@ -58,14 +69,58 @@ export function useChatStore() {
     state.providerSecrets[providerId][key] = value
   }
 
-  function clear() {
-    state.messages = []
+  function createSession(modelId, title) {
+    const sid = uuidv4()
+    const session = { id: sid, title: title || `会话 ${new Date().toLocaleString()}`, createdAt: Date.now(), messages: [] }
+    if (!state.messagesByModel[modelId]) state.messagesByModel[modelId] = []
+    state.messagesByModel[modelId].unshift(session)
+    state.currentSessionByModel[modelId] = sid
+    return session
   }
+
+  function selectSession(modelId, sessionId) {
+    if (!state.messagesByModel[modelId]) return
+    const found = state.messagesByModel[modelId].find(s => s.id === sessionId)
+    if (found) state.currentSessionByModel[modelId] = sessionId
+  }
+
+  function deleteSession(modelId, sessionId) {
+    if (!state.messagesByModel[modelId]) return
+    state.messagesByModel[modelId] = state.messagesByModel[modelId].filter(s => s.id !== sessionId)
+    if (state.currentSessionByModel[modelId] === sessionId) {
+      state.currentSessionByModel[modelId] = state.messagesByModel[modelId]?.[0]?.id || null
+    }
+  }
+
+  function clearCurrentSession(modelId) {
+    const sid = state.currentSessionByModel[modelId]
+    if (!sid) return
+    const session = state.messagesByModel[modelId]?.find(s => s.id === sid)
+    if (session) session.messages = []
+  }
+
+  const sessionsForActiveModel = computed(() => {
+    return state.messagesByModel[state.activeModelId] || []
+  })
+
+  const currentSession = computed(() => {
+    const sid = state.currentSessionByModel[state.activeModelId]
+    return (state.messagesByModel[state.activeModelId] || []).find(s => s.id === sid) || null
+  })
 
   async function sendMessage(text) {
     if (!text?.trim()) return
-    const userMsg = { id: uuidv4(), role: 'user', content: text, modelId: state.activeModelId }
-    state.messages.push(userMsg)
+    const modelId = state.activeModelId
+    if (!state.messagesByModel[modelId] || !state.currentSessionByModel[modelId]) {
+      // create a session automatically if none
+      const s = createSession(modelId, '新会话')
+    }
+    const sid = state.currentSessionByModel[modelId]
+    const session = state.messagesByModel[modelId].find(s => s.id === sid)
+    if (!session) return
+
+    const userMsg = { id: uuidv4(), role: 'user', content: text, modelId }
+    session.messages.push(userMsg)
 
     const provider = activeProvider.value
     if (!provider) {
@@ -77,9 +132,9 @@ export function useChatStore() {
     state.error = null
 
     try {
-      const context = { messages: state.messages, providerSecrets: state.providerSecrets[provider.id] || {} }
+      const context = { messages: session.messages, providerSecrets: state.providerSecrets[provider.id] || {} }
       const replyText = await provider.sendMessage(text, context)
-      state.messages.push({ id: uuidv4(), role: 'assistant', content: replyText, modelId: provider.id })
+      session.messages.push({ id: uuidv4(), role: 'assistant', content: replyText, modelId: provider.id })
     } catch (e) {
       console.error(e)
       state.error = e?.message || '发送失败'
@@ -88,8 +143,13 @@ export function useChatStore() {
     }
   }
 
+  function clear() {
+    // clear current session for active model
+    clearCurrentSession(state.activeModelId)
+  }
+
   watch(state, () => persistState(state), { deep: true })
 
-  _store = { state, activeProvider, setActiveModel, setProviderSecret, sendMessage, clear }
+  _store = { state, activeProvider, sessionsForActiveModel, currentSession, createSession, selectSession, deleteSession, setActiveModel, setProviderSecret, sendMessage, clear }
   return _store
 }
