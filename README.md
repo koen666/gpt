@@ -2,6 +2,8 @@
 
 基于 Vue 3 + Vite 的前端聊天骨架，内置“本地模拟模型（无需配置）”与 OpenAI Provider 示例，可在左侧自由切换模型。
 
+目前可访问地址[http:](http://gpt.koen.top/)
+
 ## Recommended IDE Setup
 
 [VS Code](https://code.visualstudio.com/) + [Vue (Official)](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur).
