@@ -1,15 +1,15 @@
 <script setup>
-import { computed } from 'vue'
+import { ref, computed } from 'vue'
 import { useChatStore } from '../../stores/useChatStore'
+
 import deepseekImg from '../../assets/image/deepseek.webp'
 import doubaoImg from '../../assets/image/doubao.png'
 import chatgptImg from '../../assets/image/chatgpt.png'
 
 const { state, setActiveModel, sessionsForActiveModel, currentSession, createSession, selectSession, deleteSession, setProviderSecret } = useChatStore()
-const providers = computed(() => state.providers)
+const providers = computed(() => state.providers || [])
 const activeId = computed(() => state.activeModelId)
-const sessions = computed(() => sessionsForActiveModel.value)
-
+const sessions = computed(() => sessionsForActiveModel.value || [])
 
 const icons = {
   deepseek: deepseekImg,
@@ -17,22 +17,18 @@ const icons = {
   chatgpt: chatgptImg,
 }
 
+const showSettings = ref(false)
+
 function select(id) { setActiveModel(id) }
-function newSession() { createSession(state.activeModelId, '新会话') }
+function newChat() { createSession(state.activeModelId, '新会话') }
 function pickSession(sid) { selectSession(state.activeModelId, sid) }
 function removeSession(sid) { deleteSession(state.activeModelId, sid) }
-function newChat() { createSession(state.activeModelId, '新会话') }
-import { ref } from 'vue'
-const showSettings = ref(false)
 function openSettings() { showSettings.value = true }
 function closeSettings() { showSettings.value = false }
 
-function setKey(providerId, value) {
-  setProviderSecret(providerId, 'apiKey', value)
-}
+function setKey(providerId, value) { setProviderSecret(providerId, 'apiKey', value) }
 
 function exportYaml() {
-  // Try to POST to a local dev server which writes the file to ./src/config/model.yaml
   const endpoint = window.__CONFIG_WRITER_ENDPOINT__ || 'http://localhost:4001/save-config'
   const data = {}
   for (const p of providers.value) {
@@ -40,7 +36,6 @@ function exportYaml() {
     data[p.id] = { apiKey: s.apiKey || '' }
   }
 
-  // POST to local writer; if it fails, fallback to download
   fetch(endpoint, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -51,13 +46,11 @@ function exportYaml() {
       return r.json()
     })
     .then(() => {
-      // success - notify and close
       try { alert('已保存到本地仓库路径 src/config/model.yaml（请在本地运行 save-config-server）') } catch (e) {}
       closeSettings()
     })
     .catch(err => {
       console.warn('Local save failed, falling back to download:', err)
-      // fallback: download file
       const yamlLines = []
       Object.keys(data).forEach(k => {
         yamlLines.push(`${k}:`)
@@ -80,48 +73,51 @@ function exportYaml() {
 
 <template>
   <div class="sidebar-wrap">
-    <div class="sidebar-actions">
-      <button class="sa-btn" @click="newChat"><span class="sa-ico">✚</span><span class="sa-label">新建聊天</span></button>
-      <button class="sa-btn" @click="openSettings"><span class="sa-ico">⚙</span><span class="sa-label">设置</span></button>
-    </div>
+    <div class="sidebar-top">
+      <button class="top-action" @click="newChat">
+        <span class="act-ico">+</span>
+        <span class="act-label">新建聊天</span>
+      </button>
 
-    <h3>模型</h3>
-
-    <div class="model-list">
-      <button
-        v-for="p in providers"
-        :key="p.id"
-        :class="['model-card', { active: p.id === activeId } ]"
-        @click="select(p.id)"
-      >
-        <div class="avatar">
-          <img v-if="icons[p.id]" :src="icons[p.id]" :alt="p.name" />
-          <span v-else>{{ p.name.charAt(0) }}</span>
-        </div>
-        <div class="meta">
-          <div class="name">{{ p.name }}</div>
-          <div class="desc">{{ p.description }}</div>
-        </div>
+      <button class="top-action" @click="openSettings">
+        <span class="act-ico">⚙</span>
+        <span class="act-label">设置</span>
       </button>
     </div>
 
-    <div style="margin-top:14px">
-      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px">
-        <h3 style="margin:0">历史记录</h3>
-      </div>
-
-      <div class="session-list">
-        <button v-for="s in sessions" :key="s.id" :class="['session-item', { active: currentSession && currentSession.id === s.id }]" @click="pickSession(s.id)">
-          <div class="s-left">
-            <div class="s-title">{{ s.title }}</div>
-            <div class="s-time">{{ new Date(s.createdAt).toLocaleString() }}</div>
+    <div class="model-section">
+      <h4 class="section-title">模型</h4>
+      <div class="model-list">
+        <button v-for="p in providers" :key="p.id" :class="['model-card', { active: p.id === activeId } ]" @click="select(p.id)">
+          <div class="avatar-wrap">
+            <div class="avatar-inner">
+              <img v-if="icons[p.id]" :src="icons[p.id]" :alt="p.name" />
+              <span v-else class="avatar-letter">{{ p.name.charAt(0) }}</span>
+            </div>
           </div>
-          <div class="s-right">
-            <button class="btn-del" @click.stop="removeSession(s.id)">删除</button>
+          <div class="meta">
+            <div class="name">{{ p.name }}</div>
+            <div class="desc">{{ p.description }}</div>
           </div>
         </button>
-        <div v-if="!sessions || sessions.length===0" class="no-sessions">暂无历史，会话将自动保存。</div>
       </div>
+    </div>
+
+    <div class="history-section">
+      <h4 class="section-title">历史记录</h4>
+
+      <div v-if="sessions && sessions.length" class="history-list">
+        <button v-for="s in sessions" :key="s.id" class="history-item" :class="{ active: currentSession && currentSession.id === s.id }" @click="pickSession(s.id)">
+          <div class="h-left">
+            <div class="h-title">{{ s.title }}</div>
+            <div class="h-meta">{{ new Date(s.createdAt).toLocaleString() }} · {{ s.messages?.length || 0 }} 条</div>
+          </div>
+          <div class="h-right">
+            <button class="h-del" @click.stop="removeSession(s.id)">删除</button>
+          </div>
+        </button>
+      </div>
+      <div v-else class="history-empty">暂无历史，会话将自动保存。</div>
     </div>
 
     <!-- Settings Modal -->
@@ -148,39 +144,44 @@ function exportYaml() {
         </div>
       </div>
     </div>
-
   </div>
 </template>
 
 <style scoped>
-.sidebar-wrap { padding: 12px; }
-.sidebar-wrap h3 { margin-bottom: 8px; font-weight: 700; color: #d6d6d6 }
-.model-list { display: grid; gap: 8px; }
-.model-card { display:flex; gap: 8px; align-items:flex-start; padding:10px; border-radius:8px; background: rgba(255,255,255,0.02); border: none; color: #fff; text-align: left; cursor: pointer; }
-.model-card:hover { background: rgba(255,255,255,0.03); }
-.model-card.active { box-shadow: inset 0 0 0 1px rgba(255,255,255,0.03); background: rgba(255,255,255,0.035); }
-.model-card .avatar { width:36px; height:36px; border-radius: 8px; background: rgba(255,255,255,0.04); display:flex; align-items:center; justify-content:center; font-weight:700; overflow: hidden }
-.model-card .avatar img { width: 100%; height: 100%; object-fit: cover; display:block }
-.model-card .meta .name { font-size:14px; font-weight:600 }
-.model-card .meta .desc { font-size:12px; color: #a9a9a9; margin-top:4px }
+.sidebar-wrap { padding: 10px 8px; display:flex; flex-direction:column; height:100%; color:#fff }
+.sidebar-top { display:flex; flex-direction:column; gap:12px; margin-bottom:18px }
+.top-action { display:flex; align-items:center; gap:12px; padding:6px 8px; border-radius:8px; background: transparent; border:none; color:#fff; cursor:pointer; width:100%; }
+.top-action:hover { background: rgba(255,255,255,0.02) }
+.act-ico { display:inline-flex; align-items:center; justify-content:center; width:36px; height:36px; background: rgba(255,255,255,0.06); border-radius:8px; font-weight:800; color:#fff; font-size:18px }
+.act-label { font-size:14px; font-weight:800; color:#fff }
 
-/* sessions */
-.btn-new { background: transparent; border: 1px solid rgba(255,255,255,0.04); color: #fff; padding:4px 8px; border-radius:6px; cursor:pointer }
-.session-list { display: grid; gap:8px; margin-top:6px }
-.session-item { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:8px; border-radius:8px; background: rgba(255,255,255,0.01); border:none; color:#fff; text-align:left; cursor:pointer }
-.session-item .s-left { flex:1; text-align:left }
-.session-item .s-title { font-size:13px; font-weight:600 }
-.session-item .s-time { font-size:11px; color:#a8a8a8; margin-top:4px }
-.session-item .btn-del { background: transparent; border: none; color: #ff7b7b; cursor:pointer; padding:6px }
-.session-item.active { background: rgba(255,255,255,0.03); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02) }
-.no-sessions { color:#9a9a9a; font-size:13px; padding:8px }
+/* Make the icon square slightly inset like screenshot */
+.top-action .act-ico { box-shadow: inset 0 0 0 1px rgba(0,0,0,0.25); }
 
-/* sidebar actions (ChatGPT-like) */
-.sidebar-actions { display:flex; flex-direction:column; gap:8px; margin-bottom:8px }
-.sa-btn { display:flex; align-items:center; gap:8px; padding:8px 10px; border-radius:8px; background: transparent; border: none; color:#fff; cursor:pointer; text-align:left }
-.sa-btn:hover { background: rgba(255,255,255,0.02) }
-.sa-ico { width:28px; height:28px; display:inline-flex; align-items:center; justify-content:center; background: rgba(255,255,255,0.03); border-radius:6px; font-size:14px }
-.sa-label { font-size:13px; font-weight:600 }
+.model-section h4, .history-section h4 { margin:8px 0; font-size:13px; color:#cfcfcf }
+.model-list { display:flex; flex-direction:column; gap:8px }
+.model-card { display:flex; gap:12px; align-items:center; padding:12px; border-radius:12px; background: rgba(255,255,255,0.015); border:none; text-align:left; color:#fff; cursor:pointer; box-shadow: 0 0 0 1px rgba(0,0,0,0.12) inset }
+.model-card:hover { background: rgba(255,255,255,0.03) }
+.model-card.active { background: rgba(255,255,255,0.04); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02) }
+.avatar-wrap { width:48px; height:48px; display:flex; align-items:center; justify-content:center }
+.avatar-inner { width:44px; height:44px; border-radius:8px; background:#fff; display:flex; align-items:center; justify-content:center; overflow:hidden }
+.avatar-inner img { width:100%; height:100%; object-fit:cover }
+.avatar-letter { color:#111; font-weight:700 }
+.meta .name { font-size:15px; font-weight:800 }
+.meta .desc { font-size:12px; color:#a9a9a9; margin-top:2px }
+
+.history-section { margin-top:18px; flex:1 }
+.history-empty { color:#9a9a9a; font-size:13px; padding-top:8px }
+
+.section-title { font-size:16px; font-weight:800; color:#e6e6e6; margin:10px 0 }
+
+.history-list { display:flex; flex-direction:column; gap:8px; margin-top:6px }
+.history-item { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:10px; border-radius:8px; background: rgba(255,255,255,0.01); border:none; color:#fff; text-align:left; cursor:pointer }
+.history-item.active { background: rgba(255,255,255,0.03); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02) }
+.history-item .h-left { display:flex; flex-direction:column; align-items:flex-start }
+.h-title { font-size:14px; font-weight:700 }
+.h-meta { font-size:12px; color:#a8a8a8; margin-top:4px }
+.h-del { background: transparent; border: none; color: #ff7b7b; cursor:pointer; padding:6px }
 
 /* settings modal */
 .settings-overlay { position:fixed; inset:0; background: rgba(0,0,0,0.45); display:flex; align-items:center; justify-content:center; z-index:60 }
@@ -196,3 +197,4 @@ function exportYaml() {
 .settings-footer { display:flex; justify-content:flex-end; margin-top:12px }
 .settings-footer .btn { background: transparent; border:1px solid rgba(255,255,255,0.04); color:#fff; padding:6px 12px; border-radius:8px; cursor:pointer }
 </style>
+
